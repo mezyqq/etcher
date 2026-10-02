@@ -96,6 +96,9 @@ const config: ForgeConfig = {
 			options: {
 				icon: './assets/icon.png',
 				categories: ['Utility'],
+				// the AppImageKit release the maker defaults to is gone (404),
+				// the static type2 runtime also works without libfuse2
+				type2runtime: true,
 			},
 		}),
 		new MakerRpm({
