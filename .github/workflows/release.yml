@@ -88,9 +88,13 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          files=$(find dist -type f \( -name '*.deb' -o -name '*.rpm' -o -name '*.AppImage' -o -name '*.exe' \))
-          echo "$files"
-          gh release create "$GITHUB_REF_NAME" $files \
+          # Squirrel names the installer "balenaEtcher-<version> Setup.exe"
+          for exe in dist/*/*Setup.exe dist/*Setup.exe; do
+            if [ -f "$exe" ]; then mv "$exe" "${exe% Setup.exe}-Setup.exe"; fi
+          done
+          mapfile -t files < <(find dist -type f \( -name '*.deb' -o -name '*.rpm' -o -name '*.AppImage' -o -name '*.exe' \))
+          printf '%s\n' "${files[@]}"
+          gh release create "$GITHUB_REF_NAME" "${files[@]}" \
             --repo "$GITHUB_REPOSITORY" \
             --title "$GITHUB_REF_NAME" \
             --notes "Etcher with a **Windows** tab for creating bootable Windows installation USB drives from a Windows ISO. See the README for details.
@@ -100,6 +104,6 @@ jobs:
           | \`*.AppImage\` | any Linux distribution (\`chmod +x\` and run) |
           | \`*.deb\` | Debian, Ubuntu, Mint |
           | \`*.rpm\` | Fedora, openSUSE, RHEL |
-          | \`*Setup.exe\` | Windows 10/11 |
+          | \`*-Setup.exe\` | Windows 10/11 |
 
           Writing Windows media with an install.wim over 4GB needs [wimlib](https://wimlib.net) installed. The Windows installer is not code signed, so SmartScreen will warn before running it."
