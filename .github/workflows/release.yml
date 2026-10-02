@@ -1,0 +1,87 @@
+name: Release
+on:
+  push:
+    tags: ['v*']
+  # build without publishing, to try changes out
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  linux:
+    # oldest supported runner, so the packages run on older glibc too
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: npm-shrinkwrap.json
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install packaging tools
+        run: sudo apt-get update && sudo apt-get install -y rpm squashfs-tools fakeroot dpkg
+      - run: npm ci
+      - name: Build deb, rpm and AppImage
+        run: npx electron-forge make --targets @electron-forge/maker-deb,@electron-forge/maker-rpm,@reforged/maker-appimage
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux
+          if-no-files-found: error
+          path: |
+            out/make/**/*.deb
+            out/make/**/*.rpm
+            out/make/**/*.AppImage
+
+  windows:
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: npm-shrinkwrap.json
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: npm ci
+      - name: Build Setup.exe
+        run: npx electron-forge make --targets @electron-forge/maker-squirrel
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows
+          if-no-files-found: error
+          path: out/make/squirrel.windows/**/*.exe
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/')
+    needs: [linux, windows]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+      - name: Publish GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          files=$(find dist -type f \( -name '*.deb' -o -name '*.rpm' -o -name '*.AppImage' -o -name '*.exe' \))
+          echo "$files"
+          gh release create "$GITHUB_REF_NAME" $files \
+            --repo "$GITHUB_REPOSITORY" \
+            --title "$GITHUB_REF_NAME" \
+            --notes "Etcher with a **Windows** tab for creating bootable Windows installation USB drives from a Windows ISO. See the README for details.
+
+          | File | For |
+          | --- | --- |
+          | \`*.AppImage\` | any Linux distribution (\`chmod +x\` and run) |
+          | \`*.deb\` | Debian, Ubuntu, Mint |
+          | \`*.rpm\` | Fedora, openSUSE, RHEL |
+          | \`*Setup.exe\` | Windows 10/11 |
+
+          Writing Windows media with an install.wim over 4GB needs [wimlib](https://wimlib.net) installed. The Windows installer is not code signed, so SmartScreen will warn before running it."
