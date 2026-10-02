@@ -25,7 +25,25 @@ jobs:
       - name: Install packaging tools
         run: sudo apt-get update && sudo apt-get install -y rpm squashfs-tools fakeroot dpkg
       - run: npm ci
+      # The AppImage maker downloads its runtime from GitHub "continuous"
+      # releases, which are re-uploaded all the time and 404 now and then.
+      # Fetch them with retries and serve them to the maker locally.
+      - name: Fetch AppImage runtime
+        run: |
+          mkdir -p appimage-mirror/continuous
+          cd appimage-mirror/continuous
+          curl -fsSL --retry 10 --retry-all-errors --retry-delay 15 -o runtime-x86_64 \
+            https://github.com/AppImage/type2-runtime/releases/download/continuous/runtime-x86_64
+          curl -fsSL --retry 10 --retry-all-errors --retry-delay 15 -o AppRun-x86_64 \
+            https://github.com/AppImage/AppImageKit/releases/download/continuous/AppRun-x86_64
+          ls -la
+          cd ../..
+          python3 -m http.server 8765 --bind 127.0.0.1 --directory appimage-mirror > /dev/null 2>&1 &
+          sleep 2
+          curl -fsI http://127.0.0.1:8765/continuous/runtime-x86_64 > /dev/null
       - name: Build deb, rpm and AppImage
+        env:
+          REFORGED_APPIMAGEKIT_MIRROR: http://127.0.0.1:8765/
         run: npx electron-forge make --targets @electron-forge/maker-deb,@electron-forge/maker-rpm,@reforged/maker-appimage
       - uses: actions/upload-artifact@v4
         with:

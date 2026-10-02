@@ -96,9 +96,10 @@ const config: ForgeConfig = {
 			options: {
 				icon: './assets/icon.png',
 				categories: ['Utility'],
-				// the AppImageKit release the maker defaults to is gone (404),
-				// the static type2 runtime also works without libfuse2
-				type2runtime: true,
+				// The AppImageKit release the maker defaults to is gone (404). CI
+				// points REFORGED_APPIMAGEKIT_MIRROR at a local copy of the type2
+				// runtime (works without libfuse2), see .github/workflows/release.yml
+				AppImageKitRelease: 'continuous',
 			},
 		}),
 		new MakerRpm({
