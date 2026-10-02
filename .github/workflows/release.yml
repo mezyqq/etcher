@@ -44,7 +44,7 @@ jobs:
       - name: Build deb, rpm and AppImage
         env:
           REFORGED_APPIMAGEKIT_MIRROR: http://127.0.0.1:8765/
-        run: npx electron-forge make --targets @electron-forge/maker-deb,@electron-forge/maker-rpm,@reforged/maker-appimage
+        run: npx electron-forge make --targets deb,rpm,AppImage
       - uses: actions/upload-artifact@v4
         with:
           name: linux
@@ -68,7 +68,7 @@ jobs:
           python-version: '3.11'
       - run: npm ci
       - name: Build Setup.exe
-        run: npx electron-forge make --targets @electron-forge/maker-squirrel
+        run: npx electron-forge make --targets squirrel
       - uses: actions/upload-artifact@v4
         with:
           name: windows
