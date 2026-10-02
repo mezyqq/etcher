@@ -31,3 +31,10 @@ interface WriteOptions {
 	SourceType: string;
 	httpRequest?: any;
 }
+
+interface WindowsWriteOptions {
+	image: SourceMetadata;
+	destinations: DrivelistDrive[];
+	// folder with storage drivers (.inf) to make available to Windows setup
+	driversPath?: string;
+}

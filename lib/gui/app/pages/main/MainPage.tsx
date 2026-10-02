@@ -16,12 +16,14 @@
 
 import CogSvg from '@fortawesome/fontawesome-free/svgs/solid/gear.svg';
 import CloseSvg from '@fortawesome/fontawesome-free/svgs/solid/x.svg';
+import ChevronDownSvg from '@fortawesome/fontawesome-free/svgs/solid/chevron-down.svg';
+import ChevronRightSvg from '@fortawesome/fontawesome-free/svgs/solid/chevron-right.svg';
 import QuestionCircleSvg from '@fortawesome/fontawesome-free/svgs/solid/circle-question.svg';
 
 import * as path from 'path';
 import prettyBytes from 'pretty-bytes';
 import * as React from 'react';
-import { Alert, Flex, Link } from 'rendition';
+import { Alert, Button, Flex, Link, Txt } from 'rendition';
 import styled from 'styled-components';
 
 import FinishPage from '../../components/finish/finish';
@@ -33,6 +35,8 @@ import * as flashState from '../../models/flash-state';
 import * as selectionState from '../../models/selection-state';
 import * as settings from '../../models/settings';
 import { observe } from '../../models/store';
+import { selectFolder } from '../../os/dialog';
+import * as i18next from 'i18next';
 import { open as openExternal } from '../../os/open-external/services/open-external';
 import {
 	IconButton as BaseIcon,
@@ -102,6 +106,45 @@ const StepBorder = styled.div<{
 
 const ANALYTICS_ALERT_VISIBILITY_KEY = 'analytics_alert_visible';
 
+type FlashMode = 'linux' | 'windows';
+
+const Tabs = styled(Flex)`
+	border: 1px solid ${(props) => props.theme.colors.dark.foreground};
+	border-radius: 18px;
+	padding: 3px;
+	// Make touch events click instead of dragging
+	-webkit-app-region: no-drag;
+`;
+
+const Tab = styled.button<
+	{ active: boolean } & React.ButtonHTMLAttributes<HTMLButtonElement>
+>`
+	border: none;
+	border-radius: 15px;
+	padding: 6px 22px;
+	font-size: 14px;
+	font-weight: 600;
+	cursor: pointer;
+	color: ${(props) =>
+		props.active
+			? props.theme.colors.primary.foreground
+			: props.theme.colors.dark.foreground};
+	background-color: ${(props) =>
+		props.active ? props.theme.colors.primary.background : 'transparent'};
+
+	&:disabled {
+		cursor: default;
+		opacity: ${(props) => (props.active ? 1 : 0.4)};
+	}
+`;
+
+function isWindowsCompatibleSource(image?: SourceMetadata) {
+	return (
+		image === undefined ||
+		(image.SourceType === 'File' && /\.iso$/i.test(image.path))
+	);
+}
+
 interface MainPageStateFromStore {
 	isFlashing: boolean;
 	hasImage: boolean;
@@ -119,6 +162,9 @@ interface MainPageState {
 	hideSettings: boolean;
 	featuredProjectURL?: string;
 	analyticsAlertIsVisible: boolean;
+	flashMode: FlashMode;
+	windowsDriversPath: string;
+	showWindowsAdvanced: boolean;
 }
 
 export class MainPage extends React.Component<
@@ -133,6 +179,9 @@ export class MainPage extends React.Component<
 			hideSettings: true,
 			analyticsAlertIsVisible:
 				localStorage.getItem(ANALYTICS_ALERT_VISIBILITY_KEY) !== 'false',
+			flashMode: settings.getSync('flashMode') ?? 'linux',
+			windowsDriversPath: settings.getSync('windowsDriversPath') ?? '',
+			showWindowsAdvanced: false,
 			...this.stateHelper(),
 		};
 	}
@@ -172,7 +221,128 @@ export class MainPage extends React.Component<
 		observe(() => {
 			this.setState(this.stateHelper());
 		});
-		this.setState({ featuredProjectURL: await this.getFeaturedProjectURL() });
+		const windowsDriversPath = (await settings.get('windowsDriversPath')) ?? '';
+		this.setState({
+			featuredProjectURL: await this.getFeaturedProjectURL(),
+			flashMode: (await settings.get('flashMode')) ?? 'linux',
+			windowsDriversPath,
+			// Keep active advanced options in sight
+			showWindowsAdvanced: windowsDriversPath !== '',
+		});
+	}
+
+	private async setFlashMode(flashMode: FlashMode) {
+		if (this.state.isFlashing || flashMode === this.state.flashMode) {
+			return;
+		}
+		if (
+			flashMode === 'windows' &&
+			!isWindowsCompatibleSource(selectionState.getImage())
+		) {
+			selectionState.deselectImage();
+		}
+		this.setState({ flashMode });
+		await settings.set('flashMode', flashMode);
+	}
+
+	private async setWindowsDriversPath(windowsDriversPath: string) {
+		this.setState({ windowsDriversPath });
+		await settings.set('windowsDriversPath', windowsDriversPath);
+	}
+
+	private async selectWindowsDrivers() {
+		const folder = await selectFolder(i18next.t('windows.selectDrivers'));
+		if (folder) {
+			await this.setWindowsDriversPath(folder);
+		}
+	}
+
+	private renderTabs() {
+		const modes: Array<[FlashMode, string]> = [
+			['linux', i18next.t('windows.tabLinux')],
+			['windows', i18next.t('windows.tabWindows')],
+		];
+		return (
+			<Flex justifyContent="center" mt="56px" mb="20px">
+				<Tabs>
+					{modes.map(([mode, label]) => (
+						<Tab
+							key={mode}
+							active={this.state.flashMode === mode}
+							disabled={this.state.isFlashing}
+							onClick={() => this.setFlashMode(mode)}
+						>
+							{label}
+						</Tab>
+					))}
+				</Tabs>
+			</Flex>
+		);
+	}
+
+	private renderWindowsOptions() {
+		const { windowsDriversPath, showWindowsAdvanced } = this.state;
+		const Chevron = showWindowsAdvanced ? ChevronDownSvg : ChevronRightSvg;
+		return (
+			<Flex
+				mt="24px"
+				flexDirection="column"
+				style={{ fontSize: '12px', color: theme.colors.dark.foreground }}
+			>
+				<Link
+					onClick={() =>
+						this.setState({ showWindowsAdvanced: !showWindowsAdvanced })
+					}
+					style={{ alignSelf: 'flex-start' }}
+				>
+					<Chevron height="0.8em" fill="currentColor" />{' '}
+					{i18next.t('windows.advanced')}
+					{!showWindowsAdvanced &&
+						windowsDriversPath &&
+						` (${i18next.t('windows.driversEnabled')})`}
+				</Link>
+				{showWindowsAdvanced && this.renderWindowsDrivers()}
+			</Flex>
+		);
+	}
+
+	private renderWindowsDrivers() {
+		const { windowsDriversPath, isFlashing } = this.state;
+		return (
+			<Flex mt="12px" alignItems="center" justifyContent="space-between">
+				<Flex flexDirection="column" mr="16px" style={{ minWidth: 0 }}>
+					<Txt bold>{i18next.t('windows.drivers')}</Txt>
+					<Txt
+						style={{
+							overflow: 'hidden',
+							textOverflow: 'ellipsis',
+							whiteSpace: 'nowrap',
+						}}
+						tooltip={windowsDriversPath || undefined}
+					>
+						{windowsDriversPath || i18next.t('windows.driversHint')}
+					</Txt>
+				</Flex>
+				<Flex style={{ flexShrink: 0 }}>
+					{windowsDriversPath && (
+						<Button
+							plain
+							mr="12px"
+							disabled={isFlashing}
+							onClick={() => this.setWindowsDriversPath('')}
+						>
+							{i18next.t('windows.removeDrivers')}
+						</Button>
+					)}
+					<Button
+						disabled={isFlashing}
+						onClick={() => this.selectWindowsDrivers()}
+					>
+						{i18next.t('windows.chooseDrivers')}
+					</Button>
+				</Flex>
+			</Flex>
+		);
 	}
 
 	public componentDidUpdate(
@@ -193,20 +363,26 @@ export class MainPage extends React.Component<
 			!this.state.hasImage || !this.state.hasDrive;
 		const notFlashingOrSplitView =
 			!this.state.isFlashing || !this.state.isWebviewShowing;
+		const isWindowsMode = this.state.flashMode === 'windows';
 		return (
 			<Flex
-				m={`110px ${this.state.isWebviewShowing ? 35 : 55}px 18px ${this.state.isWebviewShowing ? 35 : 55}px`}
+				m={`0 ${this.state.isWebviewShowing ? 35 : 55}px 18px ${this.state.isWebviewShowing ? 35 : 55}px`}
 				flexDirection="column"
 			>
+				{notFlashingOrSplitView && this.renderTabs()}
 				<Flex
 					justifyContent="space-between"
-					mb={this.state.analyticsAlertIsVisible ? '0px' : '92px'}
+					mt={notFlashingOrSplitView ? undefined : '110px'}
+					mb={
+						this.state.analyticsAlertIsVisible || isWindowsMode ? '0px' : '92px'
+					}
 				>
 					{notFlashingOrSplitView && (
 						<>
 							<SourceSelector
 								flashing={this.state.isFlashing}
 								hideAnalyticsAlert={this.hideAnalyticsAlert}
+								windowsMode={isWindowsMode}
 							/>
 							<Flex>
 								<StepBorder disabled={shouldDriveStepBeDisabled} left />
@@ -284,6 +460,7 @@ export class MainPage extends React.Component<
 						style={{ zIndex: 1 }}
 					/>
 				</Flex>
+				{isWindowsMode && notFlashingOrSplitView && this.renderWindowsOptions()}
 				{this.state.analyticsAlertIsVisible && (
 					<Alert mt="18px" style={{ boxShadow: 'none', fontSize: '12px' }}>
 						<Flex alignItems="center" justifyContent="space-between">

@@ -309,6 +309,8 @@ const FlowSelector = styled(
 interface SourceSelectorProps {
 	flashing: boolean;
 	hideAnalyticsAlert: () => void;
+	// Windows installation media are made from local .iso files only
+	windowsMode?: boolean;
 }
 
 interface SourceSelectorState {
@@ -421,7 +423,10 @@ export class SourceSelector extends React.Component<
 						return;
 					}
 
-					if (supportedFormats.looksLikeWindowsImage(selected)) {
+					if (
+						!this.props.windowsMode &&
+						supportedFormats.looksLikeWindowsImage(selected)
+					) {
 						this.setState({
 							warning: {
 								message: messages.warning.looksLikeWindowsImage(),
@@ -444,7 +449,11 @@ export class SourceSelector extends React.Component<
 
 						metadata = await requestMetadata({ selected, SourceType, auth });
 
-						if (!metadata?.hasMBR && this.state.warning === null) {
+						if (
+							!this.props.windowsMode &&
+							!metadata?.hasMBR &&
+							this.state.warning === null
+						) {
 							this.setState({
 								warning: {
 									message: messages.warning.missingPartitionTable(),
@@ -509,7 +518,9 @@ export class SourceSelector extends React.Component<
 		this.setState({ imageSelectorOpen: true });
 
 		try {
-			const imagePath = await osDialog.selectImage();
+			const imagePath = await osDialog.selectImage({
+				windowsMode: this.props.windowsMode,
+			});
 			// Avoid analytics and selection state changes
 			// if no file was resolved from the dialog.
 			if (!imagePath) {
@@ -646,32 +657,38 @@ export class SourceSelector extends React.Component<
 								key="Flash from file"
 								flow={{
 									onClick: () => this.openImageSelector(),
-									label: i18next.t('source.fromFile'),
+									label: this.props.windowsMode
+										? i18next.t('windows.fromFile')
+										: i18next.t('source.fromFile'),
 									icon: <FileSvg height="1em" fill="currentColor" />,
 								}}
 								onMouseEnter={() => this.setDefaultFlowActive(false)}
 								onMouseLeave={() => this.setDefaultFlowActive(true)}
 							/>
-							<FlowSelector
-								key="Flash from URL"
-								flow={{
-									onClick: () => this.openURLSelector(),
-									label: i18next.t('source.fromURL'),
-									icon: <LinkSvg height="1em" fill="currentColor" />,
-								}}
-								onMouseEnter={() => this.setDefaultFlowActive(false)}
-								onMouseLeave={() => this.setDefaultFlowActive(true)}
-							/>
-							<FlowSelector
-								key="Clone drive"
-								flow={{
-									onClick: () => this.openDriveSelector(),
-									label: i18next.t('source.clone'),
-									icon: <CopySvg height="1em" fill="currentColor" />,
-								}}
-								onMouseEnter={() => this.setDefaultFlowActive(false)}
-								onMouseLeave={() => this.setDefaultFlowActive(true)}
-							/>
+							{!this.props.windowsMode && (
+								<>
+									<FlowSelector
+										key="Flash from URL"
+										flow={{
+											onClick: () => this.openURLSelector(),
+											label: i18next.t('source.fromURL'),
+											icon: <LinkSvg height="1em" fill="currentColor" />,
+										}}
+										onMouseEnter={() => this.setDefaultFlowActive(false)}
+										onMouseLeave={() => this.setDefaultFlowActive(true)}
+									/>
+									<FlowSelector
+										key="Clone drive"
+										flow={{
+											onClick: () => this.openDriveSelector(),
+											label: i18next.t('source.clone'),
+											icon: <CopySvg height="1em" fill="currentColor" />,
+										}}
+										onMouseEnter={() => this.setDefaultFlowActive(false)}
+										onMouseLeave={() => this.setDefaultFlowActive(true)}
+									/>
+								</>
+							)}
 						</>
 					)}
 				</Flex>

@@ -41,7 +41,9 @@ async function mountSourceDrive() {
  * @description
  * Notice that by image, we mean *.img/*.iso/*.zip/etc files.
  */
-export async function selectImage(): Promise<string | undefined> {
+export async function selectImage({
+	windowsMode = false,
+}: { windowsMode?: boolean } = {}): Promise<string | undefined> {
 	await mountSourceDrive();
 	const options: electron.OpenDialogOptions = {
 		// This variable is set when running in GNU/Linux from
@@ -54,10 +56,15 @@ export async function selectImage(): Promise<string | undefined> {
 		defaultPath: process.env.OWD,
 		properties: ['openFile', 'treatPackageAsDirectory'],
 		filters: [
-			{
-				name: i18next.t('source.osImages'),
-				extensions: SUPPORTED_EXTENSIONS,
-			},
+			windowsMode
+				? {
+						name: i18next.t('windows.isoImages'),
+						extensions: ['iso'],
+					}
+				: {
+						name: i18next.t('source.osImages'),
+						extensions: SUPPORTED_EXTENSIONS,
+					},
 			{
 				name: i18next.t('source.allFiles'),
 				extensions: ['*'],
@@ -68,6 +75,21 @@ export async function selectImage(): Promise<string | undefined> {
 	const [file] = (await remote.dialog.showOpenDialog(currentWindow, options))
 		.filePaths;
 	return file;
+}
+
+/**
+ * @summary Open a folder selection dialog
+ */
+export async function selectFolder(title: string): Promise<string | undefined> {
+	const currentWindow = remote.getCurrentWindow();
+	const [folder] = (
+		await remote.dialog.showOpenDialog(currentWindow, {
+			title,
+			defaultPath: process.env.OWD,
+			properties: ['openDirectory'],
+		})
+	).filePaths;
+	return folder;
 }
 
 /**

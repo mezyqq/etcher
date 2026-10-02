@@ -22,8 +22,9 @@ import type { MultiDestinationProgress } from 'etcher-sdk/build/multi-write';
 
 import { toJSON } from '../shared/errors';
 import { GENERAL_ERROR, SUCCESS } from '../shared/exit-codes';
-import type { WriteOptions } from './types/types';
+import type { WindowsWriteOptions, WriteOptions } from './types/types';
 import { write, cleanup } from './child-writer';
+import { writeWindows, cleanupWindowsWrite } from './windows-writer';
 import { startScanning } from './scanner';
 import { getSourceMetadata } from './source-metadata';
 import type { DrivelistDrive } from '../shared/drive-constraints';
@@ -79,6 +80,7 @@ let emitSourceMetadata: (
 
 // Terminate the child process
 async function terminate(exitCode?: number) {
+	await cleanupWindowsWrite();
 	await cleanup(Date.now());
 	process.nextTick(() => {
 		process.exit(exitCode || SUCCESS);
@@ -191,6 +193,28 @@ function setup(): Promise<EmitLog> {
 			};
 
 			/**
+			 * @summary Handle `writeWindows` from client; create Windows installation media
+			 */
+			const onWriteWindows = async (options: WindowsWriteOptions) => {
+				log('writeWindows requested');
+
+				let exitCode = SUCCESS;
+				try {
+					const results = await writeWindows(options);
+					if (results.errors.length > 0) {
+						exitCode = GENERAL_ERROR;
+					}
+					emit('done', { results });
+				} catch (error: any) {
+					// nothing was written, report the reason instead of per drive results
+					exitCode = GENERAL_ERROR;
+					emit('done', { error: toJSON(error) });
+				}
+
+				await terminate(exitCode);
+			};
+
+			/**
 			 * @summary Handle `sourceMetadata` from client; get source metadata
 			 */
 			const onSourceMetadata = async (params: any) => {
@@ -252,6 +276,10 @@ function setup(): Promise<EmitLog> {
 
 				// route `write` from client
 				write: async (options: WriteOptions) => onWrite(options),
+
+				// route `writeWindows` from client
+				writeWindows: async (options: WindowsWriteOptions) =>
+					onWriteWindows(options),
 
 				// route `sourceMetadata` from client
 				sourceMetadata: async (params: any) => onSourceMetadata(params),

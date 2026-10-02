@@ -21,6 +21,66 @@ was written correctly, and much more. It can also directly flash Raspberry Pi de
 - Windows 10 and later; Intel 64-bit.
 - macOS 10.13 (High Sierra) and later; both Intel and Apple Silicon.
 
+## Flashing Windows installation media
+
+Etcher has two tabs at the top of the window:
+
+- **Linux & other** writes the image to the drive byte for byte. This is the
+  right choice for Linux distributions, Raspberry Pi OS and most other images.
+- **Windows** creates a bootable Windows installation drive from a Windows
+  `.iso` file.
+
+Windows ISOs can not be written byte for byte: the drive boots, but Windows
+setup then can not read its own files and stops with *"A media driver your
+computer needs is missing"*. The Windows tab prepares the drive the way Windows
+setup expects instead:
+
+1. The drive is erased and gets a GPT partition table with a single FAT32
+   partition labelled `WINSTALL`.
+2. The files of the ISO are copied onto it.
+3. `sources/install.wim` is usually larger than the 4GB FAT32 file size limit,
+   so it is split into `install.swm`, `install2.swm`, ... which Windows setup
+   reads natively.
+
+The drive boots on UEFI computers, including with Secure Boot enabled. Legacy
+BIOS boot is not supported.
+
+### Requirements
+
+Splitting `install.wim` needs `wimlib-imagex` from [wimlib](https://wimlib.net).
+Etcher checks for it before touching the drive and tells you if it is missing.
+
+| Operating system | Install wimlib with |
+| --- | --- |
+| Arch / Manjaro | `sudo pacman -S wimlib` |
+| Debian / Ubuntu | `sudo apt install wimtools` |
+| Fedora | `sudo dnf install wimlib-utils` |
+| macOS | `brew install wimlib` |
+| Windows | download `wimlib-imagex.exe` from [wimlib.net](https://wimlib.net) and put it next to the Etcher executable or in your `PATH` |
+
+On Linux, `parted` and `dosfstools` (`mkfs.fat`) are needed as well.
+
+On Windows, the partition is limited to 32GB because Windows can not format
+larger FAT32 volumes. The rest of a bigger drive is left unallocated.
+
+### Advanced: storage drivers
+
+Most computers do not need this. Use it only if Windows setup starts but lists
+no disks to install to, which can happen on some laptops with Intel VMD / RST
+enabled.
+
+1. Download the storage driver for your computer (for Intel VMD, the
+   "Intel Rapid Storage Technology" F6 driver from Intel or your laptop
+   vendor) and extract it, so that you have a folder with `.inf` files.
+2. On the Windows tab, open **Advanced** and choose that folder.
+
+Etcher copies the folder to `\etcher-drivers` on the drive and adds an
+`autounattend.xml` that loads those drivers when setup starts, so the disk
+shows up without clicking "Load driver". The answer file does not automate
+anything else: setup asks all its usual questions. If the ISO already contains
+its own `autounattend.xml`, Etcher keeps it and the drivers have to be loaded
+manually with "Load driver" → browse to `\etcher-drivers`.
+
 ## Installers
 
 Refer to the [downloads page][etcher] for the latest pre-made

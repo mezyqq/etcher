@@ -41,7 +41,7 @@ const translation = {
 			exitWhileFlashing:
 				'You are currently flashing a drive. Closing Etcher may leave your drive in an unusable state.',
 			looksLikeWindowsImage:
-				'It looks like you are trying to burn a Windows image.\n\nUnlike other images, Windows images require special processing to be made bootable. We suggest you use a tool specially designed for this purpose, such as <a href="https://rufus.akeo.ie">Rufus</a> (Windows), <a href="https://github.com/slacka/WoeUSB">WoeUSB</a> (Linux), or Boot Camp Assistant (macOS).',
+				'It looks like you are trying to burn a Windows image.\n\nUnlike other images, Windows images require special processing to be made bootable. Switch to the <b>Windows</b> tab at the top of the window to create a bootable Windows installation drive.',
 			image: 'image',
 			drive: 'drive',
 			missingPartitionTable:
@@ -94,6 +94,20 @@ const translation = {
 			osImages: 'OS Images',
 			allFiles: 'All',
 			enterValidURL: 'Enter a valid URL',
+		},
+		windows: {
+			tabLinux: 'Linux & other',
+			tabWindows: 'Windows',
+			fromFile: 'Windows ISO',
+			isoImages: 'Windows ISO images',
+			advanced: 'Advanced',
+			driversEnabled: 'storage drivers added',
+			drivers: 'Storage drivers (optional)',
+			driversHint:
+				'Only needed if Windows setup lists no disks to install to (e.g. Intel VMD/RST). Choose the extracted driver folder.',
+			chooseDrivers: 'Choose folder',
+			removeDrivers: 'Remove',
+			selectDrivers: 'Select a folder with storage drivers (.inf)',
 		},
 		drives: {
 			name: 'Name',

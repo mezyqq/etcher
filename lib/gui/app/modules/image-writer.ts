@@ -43,7 +43,8 @@ async function performWrite(
 	drives: DrivelistDrive[],
 	onProgress: sdk.multiWrite.OnProgressFunction,
 ): Promise<{ cancelled?: boolean }> {
-	const { autoBlockmapping, decompressFirst } = await settings.getAll();
+	const { autoBlockmapping, decompressFirst, flashMode, windowsDriversPath } =
+		await settings.getAll();
 
 	// Spawn the child process with privileges and wait for the connection to be made
 	const { emit, registerHandler } = await spawnChildAndConnect({
@@ -67,6 +68,21 @@ async function performWrite(
 
 		const onDone = (payload: any) => {
 			console.log('CHILD: flash done', payload);
+			if (payload.error) {
+				// the writer gave up before touching any drive
+				reject(errors.fromJSON(payload.error));
+				return;
+			}
+			if (flashMode === 'windows') {
+				for (const error of payload.results.errors) {
+					if (error.device) {
+						flashState.addFailedDeviceError({
+							device: error.device,
+							error: errors.fromJSON(error),
+						});
+					}
+				}
+			}
 			payload.results.errors = payload.results.errors.map(
 				(data: Dictionary<any> & { message: string }) => {
 					return errors.fromJSON(data);
@@ -120,6 +136,16 @@ async function performWrite(
 		cancelEmitter = (cancelStatus: string) => emit('cancel', cancelStatus);
 
 		// Now that we know we're connected we can instruct the child process to start the write
+		if (flashMode === 'windows') {
+			const windowsParameters = {
+				image,
+				destinations: drives,
+				driversPath: windowsDriversPath || undefined,
+			};
+			console.log('params', windowsParameters);
+			emit('writeWindows', windowsParameters);
+			return;
+		}
 		const parameters = {
 			image,
 			destinations: drives,

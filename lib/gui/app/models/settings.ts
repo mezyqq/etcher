@@ -80,6 +80,10 @@ const DEFAULT_SETTINGS: _.Dictionary<any> = {
 	desktopNotifications: true,
 	autoBlockmapping: true,
 	decompressFirst: true,
+	// 'linux' writes the image as is, 'windows' creates Windows installation media
+	flashMode: 'linux',
+	// folder with storage drivers to add to Windows installation media
+	windowsDriversPath: '',
 };
 
 const settings = _.cloneDeep(DEFAULT_SETTINGS);
